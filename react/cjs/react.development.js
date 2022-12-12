@@ -363,6 +363,7 @@ Component.prototype.setState = function (partialState, callback) {
     }
   }
 
+  // setState的入口在这里。
   this.updater.enqueueSetState(this, partialState, callback, 'setState');
 };
 /**
@@ -649,6 +650,7 @@ function warnIfStringRefCannotBeAutoConverted(config) {
  */
 
 
+// JSX对象会被转化成 React.createElement。 最终创建出来的就是ReactElement对象
 var ReactElement = function (type, key, ref, self, source, owner, props) {
   var element = {
     // This tag allows us to uniquely identify this as a React Element
@@ -693,7 +695,7 @@ var ReactElement = function (type, key, ref, self, source, owner, props) {
       writable: false,
       value: source
     });
-
+    // 不能向这个对象添加新的属性,不能修改其已有的属性值,不能删除已有属性
     if (Object.freeze) {
       Object.freeze(element.props);
       Object.freeze(element);

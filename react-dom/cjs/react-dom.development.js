@@ -13282,6 +13282,7 @@ var classComponentUpdater = {
     var fiber = get(inst);
     var eventTime = requestEventTime();
     var lane = requestUpdateLane(fiber);
+    // 在这里创建一个update
     var update = createUpdate(eventTime, lane);
     update.payload = payload;
 
@@ -13292,7 +13293,7 @@ var classComponentUpdater = {
 
       update.callback = callback;
     }
-
+    // 将update入队， 这个update是挂载在Fiber上的。
     enqueueUpdate(fiber, update);
     var root = scheduleUpdateOnFiber(fiber, lane, eventTime);
 
@@ -14212,7 +14213,7 @@ function ChildReconciler(shouldTrackSideEffects) {
 
       if (oldIndex < lastPlacedIndex) {
         // This is a move.
-        newFiber.flags |= Placement;
+        newFiber.flags |= Placement;  // DOM需要插入到页面中
         return lastPlacedIndex;
       } else {
         // This item can stay in place.
@@ -18333,7 +18334,9 @@ function transferActualDuration(fiber) {
 }
 
 var ReactCurrentOwner$1 = ReactSharedInternals.ReactCurrentOwner;
-var didReceiveUpdate = false;
+// 这个变量是用来标识是否可以直接复用前一次更新的fiber的，但是为什么是全局变量
+// 而不是在beginWork的时候传到 updateFunctionComponent /其他更新函数中去
+var didReceiveUpdate = false; 
 var didWarnAboutBadClass;
 var didWarnAboutModulePatternComponent;
 var didWarnAboutContextTypeOnFunctionComponent;
@@ -18356,7 +18359,7 @@ var didWarnAboutTailOptions;
 
 /**
  * reconcileChildren 调和函数
- * 调和函数是 `updateXXX`函数中的一项重要逻辑, 它的作用是向下生成子节点, 并设置`fiber.flags`.
+ * 调和函数是 `updateFunctionComponent / updateXXX`函数中的一项重要逻辑, 它的作用是向下生成子节点, 并设置`fiber.flags`.
  * 初次创建时 `fiber`节点没有比较对象, 所以在向下生成子节点的时候没有任何多余的逻辑, 只管创建就行.
  * 对比更新时 需要把`ReactElement`对象与`旧fiber`对象进行比较, 来判断是否需要复用`旧fiber`对象.
 */
@@ -20573,7 +20576,7 @@ function remountFiber(current, oldWorkInProgress, newWorkInProgress) {
 
 /**
  * @desc beginWork的工作是传入当前Fiber节点，创建子Fiber节点
- * @params current  当前组件对应的Fiber节点在上一次更新时的Fiber节点，即workInProgress.alternate
+ * @params current  当前组件对应的Fiber节点在本次更新前的Fiber节点，即workInProgress.alternate
  * @params workInProgress 当前组件对应的Fiber节点
  * @params renderLanes 优先级相关
 */
@@ -20586,7 +20589,7 @@ function beginWork(current, workInProgress, renderLanes) {
       return remountFiber(current, workInProgress, createFiberFromTypeAndProps(workInProgress.type, workInProgress.key, workInProgress.pendingProps, workInProgress._debugOwner || null, workInProgress.mode, workInProgress.lanes));
     }
   }
-  // 当前组件是 update
+  // 我们可以通过current === null ?来区分组件是处于mount还是update。
   if (current !== null) {
 
     console.log('beginWork update');
@@ -20597,6 +20600,7 @@ function beginWork(current, workInProgress, renderLanes) {
      workInProgress.type !== current.type )) {
       // If props or context changed, mark the fiber as having performed work.
       // This may be unset if the props are determined to be equal later (memo).
+      // 
       didReceiveUpdate = true;
     }
     // 当前Fiber节点优先级不够???
@@ -20812,6 +20816,7 @@ function beginWork(current, workInProgress, renderLanes) {
 
   workInProgress.lanes = NoLanes;
 
+  // 这里就需要根据 ta的类型，调用不同的更新函数
   switch (workInProgress.tag) {
     case IndeterminateComponent:
       {
@@ -23852,7 +23857,7 @@ function commitMutationEffectsOnFiber(finishedWork, root, renderPriorityLevel) {
 
 
   var primaryFlags = flags & (Placement | Update | Hydrating);
-
+   // commit阶段在这里 处理effectList上的操作
    switch (primaryFlags) {
     case Placement:
       {
@@ -24430,6 +24435,7 @@ function scheduleUpdateOnFiber(fiber, lane, eventTime) {
 
       performSyncWorkOnRoot(root);
     } else {
+      // 在 ensureRootIsScheduled 中，scheduleCallback会以一个优先级调度render阶段的开始函数performSyncWorkOnRoot或者performConcurrentWorkOnRoot
       ensureRootIsScheduled(root, eventTime);
       schedulePendingInteractions(root, lane);
 
@@ -24458,6 +24464,10 @@ function scheduleUpdateOnFiber(fiber, lane, eventTime) {
 /**
  * @desc 这个方法用来获取rootFiber，但是我们需要在哪个阶段用到rootFiber呢???
 */
+
+// （为什么还要去拿，直接全局存一个不好吗? 遍历的过程会处理节点的优先级）
+// 以当前节点sourceFiber为起点， 直到`HostRootFiber`, 设置父路径上所有节点的fiber.lanes和childLanes 
+// 这两个字段可以用来辅助判断子树是否需要更新。
 function markUpdateLaneFromFiberToRoot(sourceFiber, lane) {
   // Update the source fiber's lanes
   sourceFiber.lanes = mergeLanes(sourceFiber.lanes, lane);
@@ -24833,6 +24843,8 @@ function markRootSuspended$1(root, suspendedLanes) {
 } // This is the entry point for synchronous tasks that don't go
 // through Scheduler
 
+
+// render阶段的开始函数
 function performSyncWorkOnRoot(root) {
 
   if (!((executionContext & (RenderContext | CommitContext)) === NoContext)) {
@@ -25644,7 +25656,7 @@ function commitRootImpl(root, renderPriorityLevel) {
       recordCommitTime();
     }
 
-    // commit阶段 step2 mutation--------------------------------------- 
+    // commit阶段 step2 mutation------------------------------------------------------------------------- 
     // mutation 调用渲染器, 更新到最新的Fiber状态
     commitMutationEffects(root, renderPriorityLevel, finishedWork);
 
@@ -25658,7 +25670,7 @@ function commitRootImpl(root, renderPriorityLevel) {
     {
       markLayoutEffectsStarted(lanes);
     }
-    // commit阶段 step3 layout--------------------------------------- 
+    // commit阶段 step3 layout---------------------------------------------------------------------------
     commitLayoutEffects(finishedWork, root, lanes);
 
     {
@@ -26947,7 +26959,7 @@ var debugCounter = 1;
 function FiberNode(tag, pendingProps, key, mode) {
   // Instance
   this.tag = tag;  // 标识fuber类型，根据ReactElemnt组件的type进行生成
-  this.key = key; // 改节点的唯一表示，用于diff算法的哟花
+  this.key = key; // 改节点的唯一表示，用于diff算法的优化
   this.elementType = null; // 一般来讲和ReactElement组件的 type 一致
   this.type = null; // 一般来讲和fiber.elementType一致. 一些特殊情形下, 比如在开发环境下为了兼容热更新(HotReloading), 会对function, class, ForwardRef类型的ReactElement做一定的处理, 这种情况会区别于fiber.elementType
   this.stateNode = null; // 与fiber关联的局部状态节点(比如: HostComponent类型指向与fiber节点对应的 dom 节点; 根节点fiber.stateNode指向的是FiberRoot; class 类型节点其stateNode指向的是 class 实例).
