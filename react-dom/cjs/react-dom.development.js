@@ -24922,7 +24922,7 @@ function performSyncWorkOnRoot(root) {
   var finishedWork = root.current.alternate;
   root.finishedWork = finishedWork;
   root.finishedLanes = lanes;
-  // fiberRootNode被传递给commitRoot方法，开启commit阶段工作流程。
+  // 4. 开启commit阶段 fiberRootNode被传递给commitRoot方法，开启commit阶段工作流程。
   commitRoot(root); // Before exiting, make sure there's a callback scheduled for the next
   // pending level.
 
